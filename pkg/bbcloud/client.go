@@ -1,6 +1,7 @@
 package bbcloud
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/url"
@@ -114,9 +115,23 @@ type Pipeline struct {
 		Ref  struct {
 			Name string `json:"name"`
 		} `json:"ref"`
+		Selector struct {
+			Type    string `json:"type"`
+			Pattern string `json:"pattern"`
+		} `json:"selector"`
 	} `json:"target"`
-	CreatedOn   string `json:"created_on"`
-	CompletedOn string `json:"completed_on"`
+	Creator           *User  `json:"creator"`
+	CreatedOn         string `json:"created_on"`
+	CompletedOn       string `json:"completed_on"`
+	DurationInSeconds int    `json:"duration_in_seconds"`
+	Links             struct {
+		Self struct {
+			Href string `json:"href"`
+		} `json:"self"`
+		HTML struct {
+			Href string `json:"href"`
+		} `json:"html"`
+	} `json:"links"`
 }
 
 // normalizeUUID ensures a UUID has curly braces, as required by Bitbucket Cloud API.
@@ -409,36 +424,102 @@ func (c *Client) GetPipelineByBuildNumber(ctx context.Context, workspace, repoSl
 }
 
 // PipelineStep represents an individual pipeline step execution.
+// Note: The Bitbucket API nests result inside state (state.result.name),
+// not as a top-level field.
 type PipelineStep struct {
 	UUID  string `json:"uuid"`
 	Name  string `json:"name"`
 	State struct {
+		Result struct {
+			Name string `json:"name"`
+		} `json:"result"`
 		Name string `json:"name"`
 	} `json:"state"`
-	Result struct {
+	StartedOn         string            `json:"started_on"`
+	CompletedOn       string            `json:"completed_on"`
+	DurationInSeconds int               `json:"duration_in_seconds"`
+	SetupCommands     []PipelineCommand `json:"setup_commands"`
+	ScriptCommands    []PipelineCommand `json:"script_commands"`
+	Image             *struct {
 		Name string `json:"name"`
-	} `json:"result"`
+	} `json:"image"`
+}
+
+// PipelineCommand represents a command executed within a pipeline step.
+type PipelineCommand struct {
+	Name     string `json:"name"`
+	Command  string `json:"command"`
+	ExitCode *int   `json:"exit_code"`
 }
 
 // ListPipelineSteps enumerates step executions for the pipeline.
 func (c *Client) ListPipelineSteps(ctx context.Context, workspace, repoSlug, pipelineUUID string) ([]PipelineStep, error) {
-	path := fmt.Sprintf("/repositories/%s/%s/pipelines/%s/steps/",
+	path := fmt.Sprintf("/repositories/%s/%s/pipelines/%s/steps/?pagelen=100",
 		url.PathEscape(workspace),
 		url.PathEscape(repoSlug),
 		url.PathEscape(normalizeUUID(pipelineUUID)),
+	)
+
+	var steps []PipelineStep
+	for path != "" {
+		req, err := c.http.NewRequest(ctx, "GET", path, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var resp struct {
+			Values []PipelineStep `json:"values"`
+			Next   string         `json:"next"`
+		}
+		if err := c.http.Do(req, &resp); err != nil {
+			return nil, err
+		}
+
+		steps = append(steps, resp.Values...)
+
+		if resp.Next == "" {
+			break
+		}
+		nextURL, err := url.Parse(resp.Next)
+		if err != nil {
+			return nil, err
+		}
+		path = nextURL.RequestURI()
+	}
+	return steps, nil
+}
+
+// GetPipelineStep fetches a single pipeline step.
+func (c *Client) GetPipelineStep(ctx context.Context, workspace, repoSlug, pipelineUUID, stepUUID string) (*PipelineStep, error) {
+	path := fmt.Sprintf("/repositories/%s/%s/pipelines/%s/steps/%s",
+		url.PathEscape(workspace),
+		url.PathEscape(repoSlug),
+		url.PathEscape(normalizeUUID(pipelineUUID)),
+		url.PathEscape(normalizeUUID(stepUUID)),
 	)
 	req, err := c.http.NewRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	var resp struct {
-		Values []PipelineStep `json:"values"`
-	}
-	if err := c.http.Do(req, &resp); err != nil {
+	var step PipelineStep
+	if err := c.http.Do(req, &step); err != nil {
 		return nil, err
 	}
-	return resp.Values, nil
+	return &step, nil
+}
+
+// StopPipeline stops a running pipeline.
+func (c *Client) StopPipeline(ctx context.Context, workspace, repoSlug, pipelineUUID string) error {
+	path := fmt.Sprintf("/repositories/%s/%s/pipelines/%s/stopPipeline",
+		url.PathEscape(workspace),
+		url.PathEscape(repoSlug),
+		url.PathEscape(normalizeUUID(pipelineUUID)),
+	)
+	req, err := c.http.NewRequest(ctx, "POST", path, nil)
+	if err != nil {
+		return err
+	}
+	return c.http.Do(req, nil)
 }
 
 // PipelineLog represents a step log chunk.
@@ -468,12 +549,12 @@ func (c *Client) GetPipelineLogs(ctx context.Context, workspace, repoSlug, pipel
 	// Override Accept header - logs endpoint returns octet-stream, not JSON
 	req.Header.Set("Accept", "application/octet-stream")
 
-	var buf strings.Builder
+	var buf bytes.Buffer
 	if err := c.http.Do(req, &buf); err != nil {
 		return nil, err
 	}
 
-	return []byte(buf.String()), nil
+	return buf.Bytes(), nil
 }
 
 // CommitStatuses returns build statuses for a commit.

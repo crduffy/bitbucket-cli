@@ -344,22 +344,58 @@ Events (DC): `repo:refs_changed`, `repo:forked`, `repo:comment:added`, `repo:com
 
 ## Pipeline Commands (Cloud Only)
 
+### Trigger
 ```bash
-# Trigger pipeline
 bkt pipeline run --ref main
 bkt pipeline run --workspace myteam --repo api --ref main
 bkt pipeline run --ref main --var ENV=staging --var DEBUG=true
+```
 
-# List recent pipelines
-bkt pipeline list
+### List
+```bash
+bkt pipeline list                         # List recent pipelines (default: 20)
 bkt pipeline list --limit 50
+bkt pipeline list --state COMPLETED       # Filter by state (PENDING, BUILDING, COMPLETED)
+bkt pipeline list --result FAILED         # Filter by result (SUCCESSFUL, FAILED, ERROR, STOPPED)
+bkt pipeline list --ref main              # Filter by target branch
+bkt pipeline list --creator alice         # Filter by who triggered it
+```
 
-# View pipeline details
-bkt pipeline view <uuid>
+### View
+```bash
+bkt pipeline view <id>                    # Build number or UUID
+bkt pipeline view 142
+bkt pipeline view 142 --web               # Open in browser
+```
 
-# Fetch pipeline logs
-bkt pipeline logs <uuid>                  # Logs from last step
-bkt pipeline logs <uuid> --step <step-uuid>  # Specific step logs
+### Steps
+```bash
+bkt pipeline steps <id>                   # List steps with timing and status
+bkt pipeline steps 142 --json             # Structured output for scripting
+```
+
+### Logs
+```bash
+bkt pipeline logs <id>                    # Logs from last step
+bkt pipeline logs <id> --failed           # Logs from first failed step
+bkt pipeline logs <id> --all              # Logs from all steps
+bkt pipeline logs <id> --step "Deploy"    # By step name
+bkt pipeline logs <id> --step 3           # By 1-based index
+bkt pipeline logs <id> --step <step-uuid> # By UUID
+```
+
+### Watch
+```bash
+bkt pipeline watch <id>                   # Poll until pipeline completes
+bkt pipeline watch 142 --logs-on-failure  # Dump failed logs on completion
+bkt pipeline watch 142 --interval 10s     # Custom poll interval
+bkt pipeline watch 142 --timeout 30m      # Overall timeout
+```
+
+### Stop and Open
+```bash
+bkt pipeline stop <id>                    # Stop a running pipeline
+bkt pipeline open <id>                    # Open pipeline in browser
 ```
 
 ## Permission Commands (DC)

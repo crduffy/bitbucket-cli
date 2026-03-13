@@ -91,7 +91,7 @@ func runCloudPipelineStatus(cmd *cobra.Command, f *cmdutil.Factory, opts *cloudS
 				return err
 			}
 			for _, step := range steps {
-				if _, err := fmt.Fprintf(ios.Out, "  %s\t%s\t%s\n", step.UUID, step.Name, step.Result.Name); err != nil {
+				if _, err := fmt.Fprintf(ios.Out, "  %s\t%s\t%s\n", step.UUID, step.Name, step.State.Result.Name); err != nil {
 					return err
 				}
 			}
@@ -101,19 +101,5 @@ func runCloudPipelineStatus(cmd *cobra.Command, f *cmdutil.Factory, opts *cloudS
 }
 
 func resolveCloudStatusContext(cmd *cobra.Command, f *cmdutil.Factory, workspaceOverride, repoOverride string) (string, string, *config.Host, error) {
-	_, ctxCfg, host, err := cmdutil.ResolveContext(f, cmd, cmdutil.FlagValue(cmd, "context"))
-	if err != nil {
-		return "", "", nil, err
-	}
-	if host.Kind != "cloud" {
-		return "", "", nil, fmt.Errorf("command supports Bitbucket Cloud contexts only")
-	}
-
-	workspace := cmdutil.FirstNonEmpty(workspaceOverride, ctxCfg.Workspace)
-	repo := cmdutil.FirstNonEmpty(repoOverride, ctxCfg.DefaultRepo)
-	if workspace == "" || repo == "" {
-		return "", "", nil, fmt.Errorf("context must supply workspace and repo; use --workspace/--repo if needed")
-	}
-
-	return workspace, repo, host, nil
+	return cmdutil.ResolveCloudRepo(f, cmd, workspaceOverride, repoOverride)
 }

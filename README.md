@@ -240,7 +240,22 @@ bkt issue attachment delete 42 old-file.txt      # Delete an attachment
 
 Note: The issue tracker is only available for Bitbucket Cloud. Bitbucket Data Center uses Jira for issue tracking.
 
-### 6. Branch, permission, webhook, pipeline, and extension management
+### 6. Pipeline monitoring (Bitbucket Cloud)
+
+```bash
+bkt pipeline list                                    # Recent pipelines
+bkt pipeline list --result FAILED --limit 5          # Last 5 failures
+bkt pipeline view 142                                # Detailed view with steps
+bkt pipeline logs 142 --failed                       # Logs from the failed step
+bkt pipeline watch 142 --logs-on-failure             # Live-follow until done
+bkt pipeline stop 142                                # Stop a running pipeline
+bkt pipeline open 142                                # Open in browser
+bkt pipeline steps 142 --json                        # Step data for scripting
+```
+
+Pipeline commands include color-coded status output, step-level timing, automatic failed-command identification, and flexible log retrieval by step name, index, or UUID. The `watch` command polls with exponential backoff until the pipeline completes.
+
+### 7. Branch, permission, webhook, and extension management
 
 ```bash
 bkt branch list --workspace myteam           # Cloud branch listing

@@ -88,6 +88,12 @@ bkt context use cloud-team
 | Create issue | `bkt issue create -t "Bug title" -k bug` |
 | Webhooks | `bkt webhook list` |
 | Run pipeline | `bkt pipeline run --ref main` |
+| List pipelines | `bkt pipeline list` |
+| View pipeline | `bkt pipeline view <id>` |
+| Pipeline steps | `bkt pipeline steps <id>` |
+| Pipeline logs | `bkt pipeline logs <id>` |
+| Stop pipeline | `bkt pipeline stop <id>` |
+| Watch pipeline | `bkt pipeline watch <id>` |
 | API escape hatch | `bkt api /rest/api/1.0/projects` |
 
 ## Repository Operations
@@ -171,8 +177,18 @@ bkt webhook test <id>
 ```bash
 bkt pipeline run --ref main --var ENV=staging
 bkt pipeline list                         # Recent runs
-bkt pipeline view <uuid>                  # Pipeline details
-bkt pipeline logs <uuid>                  # Fetch logs
+bkt pipeline list --state COMPLETED --result FAILED  # Filter by state/result
+bkt pipeline view 142                     # Pipeline details (build number or UUID)
+bkt pipeline view 142 --web               # Open in browser
+bkt pipeline steps 142                    # List steps with timing and status
+bkt pipeline logs 142                     # Logs from last step
+bkt pipeline logs 142 --failed            # Logs from first failed step
+bkt pipeline logs 142 --all              # Logs from all steps
+bkt pipeline logs 142 --step "Deploy"     # By step name, index, or UUID
+bkt pipeline watch 142                    # Poll until pipeline completes
+bkt pipeline watch 142 --logs-on-failure  # Dump failed logs on completion
+bkt pipeline stop 142                     # Stop a running pipeline
+bkt pipeline open 142                     # Open pipeline in browser
 bkt status pipeline <uuid>                # Alt: status check
 ```
 
